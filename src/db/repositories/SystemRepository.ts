@@ -1,0 +1,253 @@
+import { StitchPilotDatabase } from '../database';
+import {
+  DEMO_BUYERS,
+  DEMO_STYLES,
+  DEMO_MATERIALS,
+  DEMO_COST_SHEETS,
+  DEMO_BOM_ITEMS,
+  DEMO_PRODUCTION_LINES,
+  DEMO_ORDERS,
+  DEMO_ORDER_ITEMS,
+  DEMO_INVENTORY_TRANSACTIONS,
+  DEMO_CUTTING_JOBS,
+  DEMO_MARKER_RATIOS,
+  DEMO_BUNDLES,
+  DEMO_PRODUCTION_EVENTS,
+  DEMO_QUALITY_INSPECTIONS,
+  DEMO_QUALITY_DEFECTS,
+} from '../demoData';
+
+export interface DatabaseStatus {
+  isOpen: boolean;
+  isSeeded: boolean;
+  seededAt: string | null;
+  tableCounts: Record<string, number>;
+  totalRecords: number;
+}
+
+export class SystemRepository {
+  constructor(private db: StitchPilotDatabase) {}
+
+  /**
+   * Checks whether the database is empty by inspecting key tables
+   */
+  async isDatabaseEmpty(): Promise<boolean> {
+    const buyerCount = await this.db.buyers.count();
+    const materialCount = await this.db.materials.count();
+    const orderCount = await this.db.orders.count();
+    return buyerCount === 0 && materialCount === 0 && orderCount === 0;
+  }
+
+  /**
+   * Checks whether the database has already been seeded with demo records
+   */
+  async isSeeded(): Promise<boolean> {
+    const meta = await this.db.system_metadata.get('is_seeded');
+    return meta?.value === 'true';
+  }
+
+  /**
+   * Seeds demo data ONLY when the database is empty or not yet seeded.
+   * Completely avoids duplicate inserts on every reload.
+   */
+  async initializeAndSeedIfEmpty(): Promise<{ seeded: boolean; message: string }> {
+    // Check metadata first
+    const alreadySeeded = await this.isSeeded();
+    const isEmpty = await this.isDatabaseEmpty();
+
+    if (alreadySeeded && !isEmpty) {
+      return {
+        seeded: false,
+        message: 'Database is already initialized and persisted.',
+      };
+    }
+
+    // Perform atomic transaction across all 15 tables
+    await this.db.transaction(
+      'rw',
+      [
+        this.db.buyers,
+        this.db.styles,
+        this.db.materials,
+        this.db.cost_sheets,
+        this.db.bom_items,
+        this.db.production_lines,
+        this.db.orders,
+        this.db.order_items,
+        this.db.inventory_transactions,
+        this.db.cutting_jobs,
+        this.db.marker_ratios,
+        this.db.bundles,
+        this.db.production_events,
+        this.db.quality_inspections,
+        this.db.quality_defects,
+        this.db.system_metadata,
+      ],
+      async () => {
+        // Bulk add all 15 entities
+        await this.db.buyers.bulkAdd(DEMO_BUYERS);
+        await this.db.styles.bulkAdd(DEMO_STYLES);
+        await this.db.materials.bulkAdd(DEMO_MATERIALS);
+        await this.db.cost_sheets.bulkAdd(DEMO_COST_SHEETS);
+        await this.db.bom_items.bulkAdd(DEMO_BOM_ITEMS);
+        await this.db.production_lines.bulkAdd(DEMO_PRODUCTION_LINES);
+        await this.db.orders.bulkAdd(DEMO_ORDERS);
+        await this.db.order_items.bulkAdd(DEMO_ORDER_ITEMS);
+        await this.db.inventory_transactions.bulkAdd(DEMO_INVENTORY_TRANSACTIONS);
+        await this.db.cutting_jobs.bulkAdd(DEMO_CUTTING_JOBS);
+        await this.db.marker_ratios.bulkAdd(DEMO_MARKER_RATIOS);
+        await this.db.bundles.bulkAdd(DEMO_BUNDLES);
+        await this.db.production_events.bulkAdd(DEMO_PRODUCTION_EVENTS);
+        await this.db.quality_inspections.bulkAdd(DEMO_QUALITY_INSPECTIONS);
+        await this.db.quality_defects.bulkAdd(DEMO_QUALITY_DEFECTS);
+
+        // Record seeding timestamp in system metadata
+        const now = new Date().toISOString();
+        await this.db.system_metadata.put({
+          key: 'is_seeded',
+          value: 'true',
+          updatedAt: now,
+        });
+        await this.db.system_metadata.put({
+          key: 'seeded_at',
+          value: now,
+          updatedAt: now,
+        });
+        await this.db.system_metadata.put({
+          key: 'schema_version',
+          value: '2.0.0',
+          updatedAt: now,
+        });
+      }
+    );
+
+    return {
+      seeded: true,
+      message: 'Demo dataset successfully seeded into IndexedDB.',
+    };
+  }
+
+  /**
+   * Retrieves row counts across all 15 tables
+   */
+  async getTableCounts(): Promise<Record<string, number>> {
+    const [
+      buyers,
+      styles,
+      orders,
+      order_items,
+      cost_sheets,
+      materials,
+      bom_items,
+      inventory_transactions,
+      cutting_jobs,
+      marker_ratios,
+      bundles,
+      production_lines,
+      production_events,
+      quality_inspections,
+      quality_defects,
+    ] = await Promise.all([
+      this.db.buyers.count(),
+      this.db.styles.count(),
+      this.db.orders.count(),
+      this.db.order_items.count(),
+      this.db.cost_sheets.count(),
+      this.db.materials.count(),
+      this.db.bom_items.count(),
+      this.db.inventory_transactions.count(),
+      this.db.cutting_jobs.count(),
+      this.db.marker_ratios.count(),
+      this.db.bundles.count(),
+      this.db.production_lines.count(),
+      this.db.production_events.count(),
+      this.db.quality_inspections.count(),
+      this.db.quality_defects.count(),
+    ]);
+
+    return {
+      buyers,
+      styles,
+      orders,
+      order_items,
+      cost_sheets,
+      materials,
+      bom_items,
+      inventory_transactions,
+      cutting_jobs,
+      marker_ratios,
+      bundles,
+      production_lines,
+      production_events,
+      quality_inspections,
+      quality_defects,
+    };
+  }
+
+  /**
+   * Retrieves high-level database diagnostics
+   */
+  async getDatabaseStatus(): Promise<DatabaseStatus> {
+    const isSeeded = await this.isSeeded();
+    const seededAtMeta = await this.db.system_metadata.get('seeded_at');
+    const tableCounts = await this.getTableCounts();
+    const totalRecords = Object.values(tableCounts).reduce((a, b) => a + b, 0);
+
+    return {
+      isOpen: this.db.isOpen(),
+      isSeeded,
+      seededAt: seededAtMeta?.value || null,
+      tableCounts,
+      totalRecords,
+    };
+  }
+
+  /**
+   * Purges all tables and reseeds demo data
+   */
+  async purgeAndReseed(): Promise<void> {
+    await this.db.transaction(
+      'rw',
+      [
+        this.db.buyers,
+        this.db.styles,
+        this.db.materials,
+        this.db.cost_sheets,
+        this.db.bom_items,
+        this.db.production_lines,
+        this.db.orders,
+        this.db.order_items,
+        this.db.inventory_transactions,
+        this.db.cutting_jobs,
+        this.db.marker_ratios,
+        this.db.bundles,
+        this.db.production_events,
+        this.db.quality_inspections,
+        this.db.quality_defects,
+        this.db.system_metadata,
+      ],
+      async () => {
+        await Promise.all([
+          this.db.buyers.clear(),
+          this.db.styles.clear(),
+          this.db.materials.clear(),
+          this.db.cost_sheets.clear(),
+          this.db.bom_items.clear(),
+          this.db.production_lines.clear(),
+          this.db.orders.clear(),
+          this.db.order_items.clear(),
+          this.db.inventory_transactions.clear(),
+          this.db.cutting_jobs.clear(),
+          this.db.marker_ratios.clear(),
+          this.db.bundles.clear(),
+          this.db.production_events.clear(),
+          this.db.quality_inspections.clear(),
+          this.db.quality_defects.clear(),
+          this.db.system_metadata.clear(),
+        ]);
+      }
+    );
+
+    await this.initializeAndSeedIfEmpty();
+  }
+}
