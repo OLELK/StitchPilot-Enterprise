@@ -14,9 +14,10 @@ export interface ProductionMetric {
 export interface HourlyProduction {
   hour: string;
   actualPcs: number;
-  targetPcs: number;
-  efficiency: number;
-  dhu: number;
+  targetPcs: number | null;
+  efficiency: number | null;
+  dhu: number | null;
+  eventCount?: number;
 }
 
 export interface LineFloorStatus {
@@ -25,12 +26,42 @@ export interface LineFloorStatus {
   buyer: string;
   styleCode: string;
   itemType: string;
-  targetPcsHr: number;
-  actualPcsHr: number;
-  efficiencyPercent: number;
-  dhuPercent: number;
+  targetPcsHr: number | null;
+  actualPcsHr: number | null;
+  shiftTargetPcs?: number | null;
+  shiftActualPcs?: number | null;
+  loggedHoursCount?: number;
+  efficiencyPercent: number | null;
+  dhuPercent: number | null;
   activeOperators: number;
   status: 'running' | 'needle-change' | 'material-wait' | 'maintenance';
+}
+
+export interface DashboardFloorNotice {
+  severity: 'nominal' | 'warning' | 'alert';
+  title: string;
+  badgeText: string;
+  description: string;
+}
+
+export interface DashboardSummaryMeta {
+  activeOrderCount: number;
+  totalOrderCount: number;
+  totalProducedPcs: number;
+  shiftTargetPcs: number | null;
+  shiftEfficiencyPercent: number | null;
+  shiftEventCount: number;
+  reportingDate: string;
+  isHistoricalDate: boolean;
+  isSimulatedShiftData: boolean;
+  shiftWindowLabel: string;
+  reportingLineCount: number;
+  totalLineCount: number;
+  runningLineCount: number;
+  totalOperators: number;
+  averageDhu: number | null;
+  inspectionCount: number;
+  floorNotice: DashboardFloorNotice;
 }
 
 export type OrderStage = 'Cutting' | 'Sewing' | 'Finishing' | 'Final QC' | 'Dispatched';

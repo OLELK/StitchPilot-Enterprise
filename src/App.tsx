@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { NavigationTab, PlantSettings } from './types';
 import { DEFAULT_PLANT_SETTINGS } from './data/mockData';
 import { Sidebar } from './components/layout/Sidebar';
@@ -10,6 +10,7 @@ import { CostingView } from './components/costing/CostingView';
 import { InventoryView } from './components/pages/InventoryView';
 import { SettingsView } from './components/pages/SettingsView';
 import { DatabaseDiagnosticModal } from './components/common/DatabaseDiagnosticModal';
+import { systemRepo } from './db/repositories';
 
 // Database Hooks
 import { useDatabase } from './db/hooks/useDatabase';
@@ -33,15 +34,31 @@ export default function App() {
     reseedDatabase,
   } = useDatabase();
 
+  // Load persisted PlantSettings from IndexedDB system_metadata when ready
+  const loadPersistedSettings = useCallback(async () => {
+    if (!isDbReady) return;
+    try {
+      const stored = await systemRepo.getPlantSettings();
+      setPlantSettings(stored);
+    } catch (err) {
+      console.error('[App] Failed to load persisted plant settings:', err);
+    }
+  }, [isDbReady]);
+
+  useEffect(() => {
+    loadPersistedSettings();
+  }, [loadPersistedSettings]);
+
   // 2. Live Dashboard Data from IndexedDB
   const {
     metrics: dashboardMetrics,
     hourlyData: dashboardHourlyData,
     lines: dashboardLines,
+    summaryMeta: dashboardSummaryMeta,
     isLoading: isDashboardLoading,
     error: dashboardError,
     refreshDashboard,
-  } = useDashboardData(isDbReady);
+  } = useDashboardData(isDbReady, plantSettings);
 
   // 3. Live Inventory Ledger Data from IndexedDB
   const {
@@ -137,12 +154,16 @@ export default function App() {
     return res;
   };
 
-  const handleSaveSettings = (updated: PlantSettings) => {
-    setPlantSettings(updated);
+  const handleSaveSettings = async (updated: PlantSettings): Promise<PlantSettings> => {
+    const persisted = await systemRepo.savePlantSettings(updated);
+    setPlantSettings(persisted);
+    return persisted;
   };
 
-  const handleResetSettings = () => {
-    setPlantSettings(DEFAULT_PLANT_SETTINGS);
+  const handleResetSettings = async (): Promise<PlantSettings> => {
+    const restored = await systemRepo.resetPlantSettings();
+    setPlantSettings(restored);
+    return restored;
   };
 
   return (
@@ -153,8 +174,10 @@ export default function App() {
         onSelectTab={setCurrentTab}
         isOpen={isMobileSidebarOpen}
         onClose={() => setIsMobileSidebarOpen(false)}
-        orderCount={dbOrders.length}
+        orderCount={orderStats.activeOrders}
         inventoryCount={stockBalances.length}
+        plantSettings={plantSettings}
+        summaryMeta={dashboardSummaryMeta}
       />
 
       {/* Main Content Area */}
@@ -165,6 +188,7 @@ export default function App() {
           onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
           onSelectTab={setCurrentTab}
           onOpenDbModal={() => setIsDbModalOpen(true)}
+          plantSettings={plantSettings}
         />
 
         {/* View Content Canvas */}
@@ -174,6 +198,8 @@ export default function App() {
               metrics={dashboardMetrics}
               hourlyData={dashboardHourlyData}
               lines={dashboardLines}
+              summaryMeta={dashboardSummaryMeta}
+              plantSettings={plantSettings}
               onNavigateTab={setCurrentTab}
               isDbLoading={isDashboardLoading || isDbLoading}
               dbError={dbError || dashboardError}
@@ -247,12 +273,14 @@ export default function App() {
         status={dbStatus}
         onReseed={async () => {
           await reseedDatabase();
+          await loadPersistedSettings();
           await refreshDashboard();
           await refreshInventory();
           await refreshOrders();
         }}
         onRefresh={async () => {
           await refreshDbStatus();
+          await loadPersistedSettings();
           await refreshDashboard();
           await refreshInventory();
           await refreshOrders();

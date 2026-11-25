@@ -114,12 +114,26 @@ export class OrderRepository {
       throw new ValidationError('Target delivery date is required.', 'targetExFactoryDate');
     }
 
-    // 2. Validate Order Quantity
+    // 2. Validate Order Quantity & Produced Quantity
     if (typeof order.orderQuantity !== 'number' || !Number.isInteger(order.orderQuantity) || order.orderQuantity <= 0) {
       throw new ValidationError(
         'Order quantity must be a positive integer.',
         'orderQuantity',
         { orderQuantity: order.orderQuantity }
+      );
+    }
+
+    if (
+      order.producedQuantity !== undefined &&
+      (typeof order.producedQuantity !== 'number' ||
+        !Number.isFinite(order.producedQuantity) ||
+        !Number.isInteger(order.producedQuantity) ||
+        order.producedQuantity < 0)
+    ) {
+      throw new ValidationError(
+        'Produced quantity cannot be negative. Enter 0 or a positive whole number.',
+        'producedQuantity',
+        { producedQuantity: order.producedQuantity }
       );
     }
 
@@ -410,6 +424,19 @@ export class OrderRepository {
   }
 
   async updateOrderProgress(orderId: string, producedQuantity: number): Promise<OrderEntity> {
+    if (
+      typeof producedQuantity !== 'number' ||
+      !Number.isFinite(producedQuantity) ||
+      !Number.isInteger(producedQuantity) ||
+      producedQuantity < 0
+    ) {
+      throw new ValidationError(
+        'Produced quantity cannot be negative. Enter 0 or a positive whole number.',
+        'producedQuantity',
+        { producedQuantity }
+      );
+    }
+
     const order = await this.db.orders.get(orderId);
     if (!order) {
       throw new EntityNotFoundError('Order', orderId);

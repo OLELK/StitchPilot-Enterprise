@@ -12,7 +12,7 @@ import {
   ListTree,
   BadgeDollarSign
 } from 'lucide-react';
-import { NavigationTab } from '../../types';
+import { DashboardSummaryMeta, NavigationTab, PlantSettings } from '../../types';
 
 interface SidebarProps {
   currentTab: NavigationTab;
@@ -21,6 +21,8 @@ interface SidebarProps {
   onClose: () => void;
   orderCount: number;
   inventoryCount: number;
+  plantSettings: PlantSettings;
+  summaryMeta?: DashboardSummaryMeta | null;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,7 +32,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   orderCount,
   inventoryCount,
+  plantSettings,
+  summaryMeta,
 }) => {
+  const shiftShort = plantSettings.activeShift.split('(')[0].trim();
+  const runningLineCount = summaryMeta?.runningLineCount ?? 0;
+  const totalLineCount = summaryMeta?.totalLineCount ?? 0;
+  const totalOperators = summaryMeta?.totalOperators ?? 0;
+  const averageDhu = summaryMeta?.averageDhu ?? null;
+  const isDhuAboveTolerance =
+    averageDhu !== null && averageDhu > plantSettings.dhuToleranceLimit;
   const navItems = [
     {
       id: 'dashboard' as NavigationTab,
@@ -91,8 +102,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ERP
               </span>
             </div>
-            <div className="text-[11px] text-zinc-400 font-mono tracking-tight">
-              Facility 04 · Knit & Fleece
+            <div className="text-[11px] text-zinc-400 font-mono tracking-tight truncate max-w-[150px]">
+              {plantSettings.plantCode}
             </div>
           </div>
         </div>
@@ -177,22 +188,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Floor Status
               </span>
               <span className="text-[10px] font-mono text-emerald-400 font-medium">
-                6 Lines Active
+                {runningLineCount}/{totalLineCount} Lines
               </span>
             </div>
 
             <div className="space-y-1 text-[11px] font-mono text-zinc-300">
               <div className="flex justify-between text-zinc-400">
-                <span>Shift A Target:</span>
-                <span className="text-zinc-200">10,000 pcs</span>
+                <span>{shiftShort} Target:</span>
+                <span className="text-zinc-200 tabular-nums">
+                  {plantSettings.plannedDailyOutput.toLocaleString()} pcs
+                </span>
               </div>
               <div className="flex justify-between text-zinc-400">
-                <span>Cut-to-Ship:</span>
-                <span className="text-zinc-200">98.4%</span>
+                <span>Floor Operators:</span>
+                <span className="text-zinc-200 tabular-nums">{totalOperators}</span>
               </div>
               <div className="flex justify-between text-zinc-400">
                 <span>Tolerance DHU:</span>
-                <span className="text-amber-400 font-semibold">3.2 / 3.0</span>
+                <span
+                  className={`font-semibold tabular-nums ${
+                    isDhuAboveTolerance ? 'text-amber-400' : 'text-zinc-200'
+                  }`}
+                >
+                  {averageDhu !== null ? averageDhu.toFixed(1) : 'N/A'} /{' '}
+                  {plantSettings.dhuToleranceLimit.toFixed(1)}
+                </span>
               </div>
             </div>
           </div>
@@ -210,7 +230,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               Floor Supervisor
             </div>
             <div className="text-[10px] font-mono text-zinc-400 truncate">
-              Shift A · Lines 01-06
+              {shiftShort} · {totalLineCount} Line{totalLineCount === 1 ? '' : 's'}
             </div>
           </div>
           <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="System Online" />

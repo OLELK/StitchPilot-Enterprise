@@ -838,7 +838,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 2.8,
     notes: 'Morning startup & warmup run',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T08:00:00.000Z',
+    timestamp: '2026-11-07T08:00:00',
     isSimulated: true,
   },
   {
@@ -852,7 +852,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 2.6,
     notes: 'Line at nominal rhythm',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T09:00:00.000Z',
+    timestamp: '2026-11-07T09:00:00',
     isSimulated: true,
   },
   {
@@ -866,7 +866,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 3.0,
     notes: 'Peak morning rhythm achieved',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T10:00:00.000Z',
+    timestamp: '2026-11-07T10:00:00',
     isSimulated: true,
   },
   {
@@ -880,7 +880,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 3.1,
     notes: 'Consistent piece output',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T11:00:00.000Z',
+    timestamp: '2026-11-07T11:00:00',
     isSimulated: true,
   },
   {
@@ -894,7 +894,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 3.4,
     notes: 'Midday meal break operator rotation',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T12:00:00.000Z',
+    timestamp: '2026-11-07T12:00:00',
     isSimulated: true,
   },
   {
@@ -908,7 +908,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 3.2,
     notes: 'Post-lunch bundle turnover high',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T13:00:00.000Z',
+    timestamp: '2026-11-07T13:00:00',
     isSimulated: true,
   },
   {
@@ -922,7 +922,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 3.5,
     notes: 'Shift peak output reached',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T14:00:00.000Z',
+    timestamp: '2026-11-07T14:00:00',
     isSimulated: true,
   },
   {
@@ -936,7 +936,7 @@ export const DEMO_PRODUCTION_EVENTS: ProductionEventEntity[] = [
     dhuPercent: 3.8,
     notes: 'Shift close and end-of-line count tally (Total: 8,450 pcs)',
     recordedBy: 'Elena Rostova',
-    timestamp: '2026-11-07T15:00:00.000Z',
+    timestamp: '2026-11-07T15:00:00',
     isSimulated: true,
   },
 ];

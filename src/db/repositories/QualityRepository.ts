@@ -20,6 +20,10 @@ export class QualityRepository {
     return this.db.quality_defects.where('inspectionId').equals(inspectionId).toArray();
   }
 
+  async getAllDefects(): Promise<QualityDefectEntity[]> {
+    return this.db.quality_defects.toArray();
+  }
+
   async createInspection(
     inspection: QualityInspectionEntity,
     defects: QualityDefectEntity[] = []

@@ -1,14 +1,23 @@
 import React from 'react';
-import { ProductionMetric, HourlyProduction, LineFloorStatus, NavigationTab } from '../../types';
+import {
+  DashboardSummaryMeta,
+  HourlyProduction,
+  LineFloorStatus,
+  NavigationTab,
+  PlantSettings,
+  ProductionMetric,
+} from '../../types';
 import { MetricCard } from '../dashboard/MetricCard';
 import { ProductionChart } from '../dashboard/ProductionChart';
 import { LineStatusTable } from '../dashboard/LineStatusTable';
-import { AlertTriangle, ArrowRight, Gauge, CheckCircle2, ChevronRight, Database, Server, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, Database, RefreshCw } from 'lucide-react';
 
 interface DashboardViewProps {
   metrics: ProductionMetric[];
   hourlyData: HourlyProduction[];
   lines: LineFloorStatus[];
+  summaryMeta?: DashboardSummaryMeta | null;
+  plantSettings: PlantSettings;
   onNavigateTab: (tab: NavigationTab) => void;
   isDbLoading?: boolean;
   dbError?: string | null;
@@ -19,11 +28,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   metrics,
   hourlyData,
   lines,
+  summaryMeta,
+  plantSettings,
   onNavigateTab,
   isDbLoading,
   dbError,
   onOpenDbModal,
 }) => {
+  const notice = summaryMeta?.floorNotice;
+  const shiftLabel = plantSettings.activeShift.split('(')[0].trim();
+
+  const noticeIconColor =
+    notice?.severity === 'alert'
+      ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+      : notice?.severity === 'warning'
+      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+      : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+
+  const noticeBadgeColor =
+    notice?.severity === 'alert'
+      ? 'bg-rose-950 text-rose-400 border-rose-800/60'
+      : notice?.severity === 'warning'
+      ? 'bg-amber-950 text-amber-400 border-amber-800/60'
+      : 'bg-emerald-950 text-emerald-400 border-emerald-800/60';
+
   return (
     <div className="space-y-6">
       {/* Database Error Banner if any */}
@@ -73,27 +101,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onClick={onOpenDbModal}
               className="text-[11px] text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors cursor-pointer"
             >
-              Run 4 Verification Tests
+              Run Verification Tests
             </button>
           )}
         </div>
       </div>
 
-      {/* Top Banner / Floor Status Alert */}
-      <div className="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Top Banner / Persisted Floor Status Notice */}
+      <div
+        data-testid="dashboard-floor-notice"
+        className="p-4 rounded-lg bg-zinc-900/90 border border-zinc-800 flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
         <div className="flex items-start gap-3">
-          <div className="p-2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
-            <AlertTriangle className="w-5 h-5" />
+          <div className={`p-2 rounded border shrink-0 ${noticeIconColor}`}>
+            {notice?.severity === 'nominal' ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <AlertTriangle className="w-5 h-5" />
+            )}
           </div>
           <div>
-            <div className="text-sm font-semibold text-zinc-100 flex items-center gap-2">
-              <span>Shift A Live Monitoring Notice</span>
-              <span className="text-[10px] font-mono uppercase bg-amber-950 text-amber-400 px-1.5 py-0.5 rounded border border-amber-800/60">
-                DHU 3.2 Tolerance
+            <div className="text-sm font-semibold text-zinc-100 flex flex-wrap items-center gap-2">
+              <span>{notice ? notice.title : `${shiftLabel} Floor Status`}</span>
+              <span className={`text-[10px] font-mono uppercase px-1.5 py-0.5 rounded border ${noticeBadgeColor}`}>
+                {notice ? notice.badgeText : 'Loading...'}
               </span>
             </div>
             <p className="text-xs text-zinc-400 mt-0.5 max-w-2xl leading-relaxed">
-              Line 03 reported skipped stitches on style ST-318 (Cotton Pique Polo). Needle gauge inspection scheduled. Lines 01, 02, 04, and 06 are operating within nominal 95%+ efficiency benchmarks.
+              {notice
+                ? notice.description
+                : 'Reading persisted line, output, and inspection records from IndexedDB...'}
             </p>
           </div>
         </div>
@@ -129,13 +166,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Production Overview Chart Section */}
       <section aria-labelledby="chart-heading">
         <h2 id="chart-heading" className="sr-only">Production Overview Chart</h2>
-        <ProductionChart data={hourlyData} />
+        <ProductionChart
+          data={hourlyData}
+          shiftLabel={shiftLabel}
+          shiftWindowLabel={summaryMeta?.shiftWindowLabel}
+          reportingDate={summaryMeta?.reportingDate}
+          isHistoricalDate={summaryMeta?.isHistoricalDate}
+          isSimulatedShiftData={summaryMeta?.isSimulatedShiftData}
+          reportingLineCount={summaryMeta?.reportingLineCount ?? 0}
+          totalLineCount={summaryMeta?.totalLineCount ?? lines.length}
+        />
       </section>
 
       {/* Floor Lines Status Table */}
       <section aria-labelledby="lines-heading">
         <h2 id="lines-heading" className="sr-only">Sewing Floor Lines Status</h2>
-        <LineStatusTable lines={lines} />
+        <LineStatusTable
+          lines={lines}
+          dhuToleranceLimit={plantSettings.dhuToleranceLimit}
+        />
       </section>
     </div>
   );

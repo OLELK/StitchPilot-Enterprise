@@ -16,6 +16,11 @@ import {
   DEMO_QUALITY_INSPECTIONS,
   DEMO_QUALITY_DEFECTS,
 } from '../demoData';
+import { PlantSettings } from '../../types';
+import { DEFAULT_PLANT_SETTINGS } from '../../data/mockData';
+import { ValidationError } from '../errors';
+
+const PLANT_SETTINGS_META_KEY = 'plant_settings';
 
 export interface DatabaseStatus {
   isOpen: boolean;
@@ -249,5 +254,123 @@ export class SystemRepository {
     );
 
     await this.initializeAndSeedIfEmpty();
+  }
+
+  /**
+   * Validates plant configuration values before persistence.
+   * Rejects negative planned daily output instead of silently coercing it to zero.
+   */
+  validatePlantSettings(settings: PlantSettings): void {
+    if (!settings.plantName || !settings.plantName.trim()) {
+      throw new ValidationError('Facility name is required.', 'plantName');
+    }
+    if (!settings.plantCode || !settings.plantCode.trim()) {
+      throw new ValidationError('Plant ERP code is required.', 'plantCode');
+    }
+    if (!settings.division || !settings.division.trim()) {
+      throw new ValidationError('Operating apparel division is required.', 'division');
+    }
+    if (
+      typeof settings.plannedDailyOutput !== 'number' ||
+      !Number.isFinite(settings.plannedDailyOutput) ||
+      !Number.isInteger(settings.plannedDailyOutput) ||
+      settings.plannedDailyOutput < 0
+    ) {
+      throw new ValidationError(
+        'Planned daily output cannot be negative. Enter 0 or a positive whole number.',
+        'plannedDailyOutput',
+        { plannedDailyOutput: settings.plannedDailyOutput }
+      );
+    }
+    if (
+      typeof settings.sewingLinesConfigured !== 'number' ||
+      !Number.isFinite(settings.sewingLinesConfigured) ||
+      !Number.isInteger(settings.sewingLinesConfigured) ||
+      settings.sewingLinesConfigured < 1 ||
+      settings.sewingLinesConfigured > 24
+    ) {
+      throw new ValidationError(
+        'Active sewing lines must be a whole number between 1 and 24.',
+        'sewingLinesConfigured',
+        { sewingLinesConfigured: settings.sewingLinesConfigured }
+      );
+    }
+    if (
+      typeof settings.dhuToleranceLimit !== 'number' ||
+      !Number.isFinite(settings.dhuToleranceLimit) ||
+      settings.dhuToleranceLimit < 0 ||
+      settings.dhuToleranceLimit > 100
+    ) {
+      throw new ValidationError(
+        'Standard DHU tolerance limit must be between 0 and 100.',
+        'dhuToleranceLimit',
+        { dhuToleranceLimit: settings.dhuToleranceLimit }
+      );
+    }
+    if (
+      typeof settings.criticalDhuAlertThreshold !== 'number' ||
+      !Number.isFinite(settings.criticalDhuAlertThreshold) ||
+      settings.criticalDhuAlertThreshold < 0 ||
+      settings.criticalDhuAlertThreshold > 100
+    ) {
+      throw new ValidationError(
+        'Critical DHU escalation limit must be between 0 and 100.',
+        'criticalDhuAlertThreshold',
+        { criticalDhuAlertThreshold: settings.criticalDhuAlertThreshold }
+      );
+    }
+  }
+
+  /**
+   * Loads persisted plant settings from system_metadata, falling back to DEFAULT_PLANT_SETTINGS.
+   */
+  async getPlantSettings(): Promise<PlantSettings> {
+    const record = await this.db.system_metadata.get(PLANT_SETTINGS_META_KEY);
+    if (!record?.value) {
+      return { ...DEFAULT_PLANT_SETTINGS };
+    }
+    try {
+      const parsed = JSON.parse(record.value) as Partial<PlantSettings>;
+      return {
+        ...DEFAULT_PLANT_SETTINGS,
+        ...parsed,
+      };
+    } catch {
+      return { ...DEFAULT_PLANT_SETTINGS };
+    }
+  }
+
+  /**
+   * Validates and persists plant settings into system_metadata without touching operational tables.
+   */
+  async savePlantSettings(settings: PlantSettings): Promise<PlantSettings> {
+    this.validatePlantSettings(settings);
+    const normalized: PlantSettings = {
+      ...DEFAULT_PLANT_SETTINGS,
+      ...settings,
+      plantName: settings.plantName.trim(),
+      plantCode: settings.plantCode.trim(),
+      division: settings.division.trim(),
+    };
+    await this.db.system_metadata.put({
+      key: PLANT_SETTINGS_META_KEY,
+      value: JSON.stringify(normalized),
+      updatedAt: new Date().toISOString(),
+    });
+    return normalized;
+  }
+
+  /**
+   * Restores plant settings to DEFAULT_PLANT_SETTINGS and persists them in system_metadata.
+   * Does NOT delete or alter orders, BOMs, cost sheets, inventory, or production records.
+   */
+  async resetPlantSettings(): Promise<PlantSettings> {
+    const defaults: PlantSettings = { ...DEFAULT_PLANT_SETTINGS };
+    await this.db.system_metadata.put({
+      key: PLANT_SETTINGS_META_KEY,
+      value: JSON.stringify(defaults),
+      updatedAt: new Date().toISOString(),
+    });
+    return defaults;
   }
 }

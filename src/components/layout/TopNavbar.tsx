@@ -1,44 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { Menu, Clock, Factory, Download, Bell, CheckCircle2, Database } from 'lucide-react';
-import { NavigationTab } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Menu, Clock, Factory, Download, CheckCircle2, Database } from 'lucide-react';
+import { NavigationTab, PlantSettings } from '../../types';
+import { formatLocalClock } from '../../db/services/shiftSchedule';
 
 interface TopNavbarProps {
   currentTab: NavigationTab;
   onOpenMobileMenu: () => void;
   onSelectTab: (tab: NavigationTab) => void;
   onOpenDbModal: () => void;
+  plantSettings: PlantSettings;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   currentTab,
   onOpenMobileMenu,
-  onSelectTab,
   onOpenDbModal,
+  plantSettings,
 }) => {
-  const [currentTime, setCurrentTime] = useState<string>('');
+  const [currentTime, setCurrentTime] = useState<string>(() => formatLocalClock(new Date()));
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const localTimeZone =
+    typeof Intl !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local'
+      : 'Local';
 
   useEffect(() => {
     const updateTime = () => {
-      const now = new Date();
-      setCurrentTime(
-        now.toLocaleTimeString('en-US', {
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        })
-      );
+      setCurrentTime(formatLocalClock(new Date()));
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (toastTimerRef.current !== null) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
   }, []);
 
   const handleExportReport = () => {
+    if (toastTimerRef.current !== null) {
+      clearTimeout(toastTimerRef.current);
+    }
     setToastMessage('Exporting shift manufacturing summary (CSV)...');
-    setTimeout(() => {
+    toastTimerRef.current = setTimeout(() => {
       setToastMessage(null);
+      toastTimerRef.current = null;
     }, 3000);
   };
 
@@ -91,21 +99,23 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           {/* Shift & Floor Status */}
           <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-900 border border-zinc-800 text-xs font-mono">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-zinc-300 font-semibold">Shift A</span>
-            <span className="text-zinc-500">·</span>
-            <span className="text-zinc-400">07:00–15:30</span>
+            <span className="text-zinc-300 font-semibold">{plantSettings.activeShift}</span>
           </div>
 
-          {/* Real-time Clock */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs font-mono text-zinc-400 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800/60">
+          {/* Single Real-time Local Factory Clock */}
+          <div
+            data-testid="header-local-clock"
+            title={`Factory Local Time (${localTimeZone})`}
+            className="hidden sm:flex items-center gap-1.5 text-xs font-mono text-zinc-400 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800/60"
+          >
             <Clock className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="tabular-nums font-medium text-zinc-300">{currentTime || '08:00:00'}</span>
+            <span className="tabular-nums font-medium text-zinc-300">{currentTime}</span>
           </div>
 
           {/* Facility Location Badge */}
           <div className="hidden xl:flex items-center gap-1.5 text-xs text-zinc-400">
             <Factory className="w-3.5 h-3.5 text-zinc-500" />
-            <span className="font-mono text-[11px] text-zinc-300">Plant Dhaka-04</span>
+            <span className="font-mono text-[11px] text-zinc-300">{plantSettings.plantCode}</span>
           </div>
 
           {/* Database Diagnostics Trigger */}

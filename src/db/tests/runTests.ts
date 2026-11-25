@@ -19,6 +19,7 @@ import { runPhase3AStage4ATests } from './runPhase3AStage4ATests';
 import { runPhase3AStage4BTests } from './runPhase3AStage4BTests';
 import { runPhase3AStage4C1Tests } from './runPhase3AStage4C1Tests';
 import { runPhase3AStage4C2Tests } from './runPhase3AStage4C2Tests';
+import { runDefectRegressionTests } from './runDefectRegressionTests';
 
 export interface TestResult {
   name: string;
@@ -536,6 +537,25 @@ export async function runAllTests(): Promise<{
       name: 'Phase 3A Stage 4C.2 Test Suite Execution',
       passed: false,
       message: `Phase 3A Stage 4C.2 runner failed: ${err.message}`,
+    });
+  }
+
+  // Include Priority Defect Regression Tests (6 checks for Bugs 1, 2 & 3)
+  try {
+    const defectRegression = await runDefectRegressionTests();
+    for (const r of defectRegression.results) {
+      results.push({
+        name: `Defect Regression Test ${r.testNumber} (${r.bugId}) — ${r.name}`,
+        passed: r.passed,
+        message: r.message,
+        details: r.details,
+      });
+    }
+  } catch (err: any) {
+    results.push({
+      name: 'Defect Regression Test Suite Execution',
+      passed: false,
+      message: `Defect regression runner failed: ${err.message}`,
     });
   }
 
